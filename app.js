@@ -1,20 +1,33 @@
-// TUS CREDENCIALES CONFIGURADAS DE SUPABASE
 const supabaseUrl = 'https://cdblyqtxpuxnhwbxykfh.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkYmx5cXR4cHV4bmh3Ynh5a2ZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMDgxMjksImV4cCI6MjA5OTc4NDEyOX0.XMozUuwLYLz3vB8UokwLNX-E-wJZr4QdVnkcVynvnjk';
 const db = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 let selectedFile = null;
 let facturasGlobal = [];
+let proveedoresCatalogo = [];
 
-// Elementos
+// Elementos DOM
 const inputFile = document.getElementById('input-file');
 const previewImg = document.getElementById('preview-img');
 const loader = document.getElementById('loader');
 const provInput = document.getElementById('prov-input');
 const montoInput = document.getElementById('monto-input');
 const fechaInput = document.getElementById('fecha-input');
+const estadoInput = document.getElementById('estado-input');
 const btnGuardar = document.getElementById('btn-guardar');
+const provDatalist = document.getElementById('lista-proveedores-datalist');
+
+// Filtros de gráfica
 const filtroGrafica = document.getElementById('filtro-grafica');
+const contFiltroMes = document.getElementById('contenedor-filtro-mes');
+const filtroMesInput = document.getElementById('filtro-mes-input');
+const contFiltroRango = document.getElementById('contenedor-filtro-rango');
+const filtroFechaDesde = document.getElementById('filtro-fecha-desde');
+const filtroFechaHasta = document.getElementById('filtro-fecha-hasta');
+
+// Proveedor manual
+const nuevoProvNombre = document.getElementById('nuevo-prov-nombre');
+const btnCrearProv = document.getElementById('btn-crear-prov');
 
 // Modales
 const modalVisor = document.getElementById('modal-visor');
@@ -23,11 +36,45 @@ const editId = document.getElementById('edit-id');
 const editProv = document.getElementById('edit-prov');
 const editMonto = document.getElementById('edit-monto');
 const editFecha = document.getElementById('edit-fecha');
+const editEstado = document.getElementById('edit-estado');
 const btnActualizar = document.getElementById('btn-actualizar');
 
-fechaInput.value = new Date().toISOString().split('T')[0];
+// Inicializar fechas
+const hoyISO = new Date().toISOString().split('T')[0];
+fechaInput.value = hoyISO;
+filtroMesInput.value = hoyISO.slice(0, 7); // AAAA-MM
+filtroFechaDesde.value = hoyISO;
+filtroFechaHasta.value = hoyISO;
 
-// OCR TESSERACT
+// 1. CARGAR PROVEEDORES
+async function cargarProveedores() {
+  const { data } = await db.from('proveedores').select('nombre').order('nombre');
+  if (data) {
+    proveedoresCatalogo = data.map(p => p.nombre.toUpperCase());
+    provDatalist.innerHTML = '';
+    proveedoresCatalogo.forEach(nombre => {
+      const opt = document.createElement('option');
+      opt.value = nombre;
+      provDatalist.appendChild(opt);
+    });
+  }
+}
+
+// 2. CREAR PROVEEDOR MANUAL
+btnCrearProv.addEventListener('click', async () => {
+  const nombre = nuevoProvNombre.value.trim().toUpperCase();
+  if (!nombre) return;
+
+  const { error } = await db.from('proveedores').insert([{ nombre }]);
+  if (error) {
+    alert('El proveedor ya existe o hubo un error');
+  } else {
+    nuevoProvNombre.value = '';
+    cargarProveedores();
+  }
+});
+
+// 3. OCR TESSERACT
 inputFile.addEventListener('change', (e) => {
   selectedFile = e.target.files[0];
   if (!selectedFile) return;
@@ -42,8 +89,17 @@ inputFile.addEventListener('change', (e) => {
       const res = await Tesseract.recognize(reader.result, 'spa');
       const lines = res.data.text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-      const provFound = lines.find(l => l.length > 3 && !/\d/.test(l));
-      if (provFound && !provInput.value) provInput.value = provFound;
+      const encontrada = lines.find(l => 
+        proveedoresCatalogo.some(p => l.toUpperCase().includes(p))
+      );
+
+      if (encontrada) {
+        const provMatch = proveedoresCatalogo.find(p => encontrada.toUpperCase().includes(p));
+        provInput.value = provMatch;
+      } else {
+        const provFound = lines.find(l => l.length > 3 && !/\d/.test(l));
+        if (provFound && !provInput.value) provInput.value = provFound.toUpperCase();
+      }
 
       const montos = [];
       const regex = /(\d+[\.,]\d{2})/;
@@ -63,11 +119,12 @@ inputFile.addEventListener('change', (e) => {
   reader.readAsDataURL(selectedFile);
 });
 
-// SUBIR NUEVA FACTURA
+// 4. SUBIR FACTURA
 btnGuardar.addEventListener('click', async () => {
   const prov = provInput.value.trim().toUpperCase();
   const monto = parseFloat(montoInput.value);
   const fecha = fechaInput.value;
+  const estado = estadoInput.value;
 
   if (!prov || isNaN(monto) || !fecha) {
     alert('Completa proveedor, monto y fecha');
@@ -78,8 +135,12 @@ btnGuardar.addEventListener('click', async () => {
   btnGuardar.disabled = true;
 
   try {
-    let imagenUrl = '';
+    if (!proveedoresCatalogo.includes(prov)) {
+      await db.from('proveedores').insert([{ nombre: prov }]);
+      cargarProveedores();
+    }
 
+    let imagenUrl = '';
     if (selectedFile) {
       const extension = selectedFile.name.split('.').pop();
       const filePath = `${Date.now()}_factura.${extension}`;
@@ -100,7 +161,8 @@ btnGuardar.addEventListener('click', async () => {
       proveedor: prov,
       monto: monto,
       fecha: fecha,
-      imagen_url: imagenUrl
+      imagen_url: imagenUrl,
+      estado: estado
     }]);
 
     if (insertError) throw insertError;
@@ -118,7 +180,7 @@ btnGuardar.addEventListener('click', async () => {
   }
 });
 
-// CONSULTAR BASE DE DATOS
+// 5. CARGAR FACTURAS
 async function cargarFacturas() {
   const { data, error } = await db
     .from('facturas')
@@ -132,22 +194,47 @@ async function cargarFacturas() {
   renderHistorialPorProveedor();
 }
 
-// ACTUALIZAR GRÁFICAS SEGÚN FILTRO DE TIEMPO (MES / AÑO / TODO)
+// 6. CAMBIO DE ESTADO
+async function cambiarEstadoRapido(id, estadoActual) {
+  const nuevoEstado = estadoActual === 'PAGADO' ? 'PENDIENTE' : 'PAGADO';
+  const { error } = await db.from('facturas').update({ estado: nuevoEstado }).eq('id', id);
+  if (!error) cargarFacturas();
+}
+
+// 7. GRÁFICAS Y FILTRADO AVANZADO DE FECHAS
 function actualizarGraficas() {
-  const periodo = filtroGrafica.value;
+  const tipoFiltro = filtroGrafica.value;
   const hoy = new Date();
   const mesActual = hoy.getMonth();
   const anioActual = hoy.getFullYear();
 
+  // Ocultar o mostrar controles adicionales
+  contFiltroMes.style.display = tipoFiltro === 'elegir_mes' ? 'block' : 'none';
+  contFiltroRango.style.display = tipoFiltro === 'rango' ? 'block' : 'none';
+
   const filtradas = facturasGlobal.filter(f => {
-    const d = new Date(f.fecha + 'T00:00:00');
-    if (periodo === 'mes') {
+    const fFechaStr = f.fecha; // 'AAAA-MM-DD'
+    const d = new Date(fFechaStr + 'T00:00:00');
+
+    if (tipoFiltro === 'mes_actual') {
       return d.getMonth() === mesActual && d.getFullYear() === anioActual;
     }
-    if (periodo === 'anio') {
+    if (tipoFiltro === 'elegir_mes') {
+      const mesSeleccionado = filtroMesInput.value; // 'AAAA-MM'
+      return fFechaStr.startsWith(mesSeleccionado);
+    }
+    if (tipoFiltro === 'rango') {
+      const desde = filtroFechaDesde.value;
+      const hasta = filtroFechaHasta.value;
+      if (desde && hasta) {
+        return fFechaStr >= desde && fFechaStr <= hasta;
+      }
+      return true;
+    }
+    if (tipoFiltro === 'anio') {
       return d.getFullYear() === anioActual;
     }
-    return true;
+    return true; // 'todo'
   });
 
   const diasNom = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -166,7 +253,7 @@ function actualizarGraficas() {
 
   document.getElementById('total-acumulado').innerText = `Q ${total.toFixed(2)}`;
 
-  // Barras amarillas
+  // Barras
   const maxGasto = Math.max(...Object.values(gastoDias), 1);
   const ordenDias = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const chartDiasCont = document.getElementById('chart-dias');
@@ -184,7 +271,7 @@ function actualizarGraficas() {
     `;
   });
 
-  // Ranking proveedores
+  // Ranking
   const listaProvCont = document.getElementById('lista-proveedores-top');
   listaProvCont.innerHTML = '';
   const provOrdenados = Object.entries(gastoProv).sort((a, b) => b[1] - a[1]);
@@ -203,7 +290,7 @@ function actualizarGraficas() {
   }
 }
 
-// HISTORIAL AGRUPADO POR PROVEEDOR Y ORDENADO POR FECHA
+// 8. HISTORIAL POR PROVEEDOR
 function renderHistorialPorProveedor() {
   const container = document.getElementById('historial-grupos');
   container.innerHTML = '';
@@ -213,14 +300,12 @@ function renderHistorialPorProveedor() {
     return;
   }
 
-  // Agrupar facturas por proveedor
   const grupos = {};
   facturasGlobal.forEach(f => {
     if (!grupos[f.proveedor]) grupos[f.proveedor] = [];
     grupos[f.proveedor].push(f);
   });
 
-  // Renderizar cada acordeón
   Object.keys(grupos).sort().forEach((prov, idx) => {
     const facturasDelProv = grupos[prov];
     const totalProv = facturasDelProv.reduce((acc, curr) => acc + parseFloat(curr.monto), 0);
@@ -250,18 +335,24 @@ function renderHistorialPorProveedor() {
         ? `<img src="${f.imagen_url}" class="thumb-img" onclick="verDetalleFoto('${f.imagen_url}', '${f.proveedor}', '${f.monto}', '${f.fecha}')">`
         : `<div class="thumb-img" style="display:grid;place-items:center;color:var(--text-muted);">🧾</div>`;
 
+      const estadoActual = f.estado || 'PENDIENTE';
+      const claseEstado = estadoActual === 'PAGADO' ? 'status-pagado' : 'status-pendiente';
+      const textoEstado = estadoActual === 'PAGADO' ? 'Pagado' : 'Pendiente';
+
       subItem.innerHTML = `
         ${imgHtml}
         <div style="flex:1;">
           <div style="font-size: 13px; font-weight: 700;">Q ${parseFloat(f.monto).toFixed(2)}</div>
           <div style="font-size: 11px; color: var(--text-muted);">${f.fecha}</div>
         </div>
-        <button class="btn-edit" onclick="abrirEditar(${f.id}, '${f.proveedor}', ${f.monto}, '${f.fecha}')">✏️</button>
+        <span class="badge-status ${claseEstado}" onclick="cambiarEstadoRapido(${f.id}, '${estadoActual}')">${textoEstado}</span>
+        <button class="btn-edit" onclick="abrirEditar(${f.id}, '${f.proveedor}', ${f.monto}, '${f.fecha}', '${estadoActual}')">✏️</button>
       `;
       content.appendChild(subItem);
     });
 
-    header.onclick = () => {
+    header.onclick = (e) => {
+      if (e.target.closest('.badge-status') || e.target.closest('.btn-edit')) return;
       const isVisible = content.style.display === 'block';
       content.style.display = isVisible ? 'none' : 'block';
       header.querySelector('span:last-child').innerHTML = `Q ${totalProv.toFixed(2)} ${isVisible ? '▾' : '▴'}`;
@@ -273,12 +364,13 @@ function renderHistorialPorProveedor() {
   });
 }
 
-// LOGICA DE EDICIÓN
-function abrirEditar(id, prov, monto, fecha) {
+// 9. MODAL EDITAR
+function abrirEditar(id, prov, monto, fecha, estado) {
   editId.value = id;
   editProv.value = prov;
   editMonto.value = monto;
   editFecha.value = fecha;
+  editEstado.value = estado || 'PENDIENTE';
   modalEditar.style.display = 'flex';
 }
 
@@ -287,6 +379,7 @@ btnActualizar.addEventListener('click', async () => {
   const prov = editProv.value.trim().toUpperCase();
   const monto = parseFloat(editMonto.value);
   const fecha = editFecha.value;
+  const estado = editEstado.value;
 
   if (!prov || isNaN(monto) || !fecha) {
     alert('Todos los campos son obligatorios');
@@ -299,7 +392,7 @@ btnActualizar.addEventListener('click', async () => {
   try {
     const { error } = await db
       .from('facturas')
-      .update({ proveedor: prov, monto: monto, fecha: fecha })
+      .update({ proveedor: prov, monto: monto, fecha: fecha, estado: estado })
       .eq('id', id);
 
     if (error) throw error;
@@ -314,7 +407,7 @@ btnActualizar.addEventListener('click', async () => {
   }
 });
 
-// CONTROL DE MODALES
+// MODALES
 function verDetalleFoto(url, prov, monto, fecha) {
   document.getElementById('modal-img').src = url;
   document.getElementById('modal-text').innerText = `${prov} — Q ${parseFloat(monto).toFixed(2)} (${fecha})`;
@@ -330,7 +423,12 @@ document.getElementById('btn-cerrar-editar').onclick = () => {
   modalEditar.style.display = 'none';
 };
 
+// Eventos de filtros de fechas
 filtroGrafica.addEventListener('change', actualizarGraficas);
+filtroMesInput.addEventListener('change', actualizarGraficas);
+filtroFechaDesde.addEventListener('change', actualizarGraficas);
+filtroFechaHasta.addEventListener('change', actualizarGraficas);
 
-// Inicio
+// Inicializar
+cargarProveedores();
 cargarFacturas();
