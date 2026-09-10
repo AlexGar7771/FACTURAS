@@ -7,7 +7,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   
+  <!-- Supabase CDN, Chart.js para gráficos interactivos y Tesseract OCR -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
@@ -25,7 +27,7 @@
       </div>
     </div>
 
-    <!-- 2. GRÁFICAS CON FILTROS AVANZADOS DE FECHA -->
+    <!-- 2. GRÁFICAS DE GASTO GENERAL -->
     <div class="card">
       <div class="card-header">
         <span class="card-title">Días de Mayor Gasto</span>
@@ -38,7 +40,6 @@
         </select>
       </div>
 
-      <!-- Controles dinámicos según el filtro seleccionado -->
       <div id="contenedor-filtro-mes" style="display: none; margin-bottom: 12px;">
         <label class="lbl-edit" style="margin-top: 0;">Selecciona el Mes:</label>
         <input type="month" id="filtro-mes-input">
@@ -61,7 +62,23 @@
       <p class="card-footer-desc">Distribución de compras por día según el periodo seleccionado.</p>
     </div>
 
-    <!-- 3. RANKING DE PROVEEDORES -->
+    <!-- 3. GRÁFICO INTERACTIVO ANIMADO POR PROVEEDOR -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Análisis por Proveedor</span>
+        <select id="select-grafico-prov" class="select-badge" style="max-width: 170px;">
+          <option value="">Selecciona...</option>
+        </select>
+      </div>
+      <div style="position: relative; height: 220px; width: 100%;">
+        <canvas id="chartProveedorInteractivo"></canvas>
+      </div>
+      <p id="total-proveedor-grafico" class="card-footer-desc" style="text-align: right; font-weight: 700; color: var(--accent);">
+        Total: Q 0.00
+      </p>
+    </div>
+
+    <!-- 4. RANKING DE PROVEEDORES -->
     <div class="card">
       <div class="card-header">
         <span class="card-title">Ranking Proveedores</span>
@@ -70,7 +87,7 @@
       <div id="lista-proveedores-top"></div>
     </div>
 
-    <!-- 4. REGISTRAR FACTURA -->
+    <!-- 5. REGISTRAR FACTURA -->
     <div class="card">
       <div class="card-header">
         <span class="card-title">Registrar Factura</span>
@@ -81,9 +98,11 @@
       <img id="preview-img" alt="Vista previa">
       <p id="loader">Leyendo datos con OCR...</p>
 
-      <label class="lbl-edit">Proveedor (Escribe o selecciona)</label>
-      <input list="lista-proveedores-datalist" id="prov-input" placeholder="Selecciona un proveedor">
-      <datalist id="lista-proveedores-datalist"></datalist>
+      <!-- Menú desplegable nativo para seleccionar proveedor -->
+      <label class="lbl-edit">Proveedor</label>
+      <select id="prov-select" class="select-dark">
+        <option value="">-- Elige un Proveedor --</option>
+      </select>
 
       <label class="lbl-edit">Monto (Q)</label>
       <input type="number" id="monto-input" step="0.01" placeholder="0.00">
@@ -92,7 +111,7 @@
       <input type="date" id="fecha-input">
 
       <label class="lbl-edit">Estado Inicial</label>
-      <select id="estado-input" class="select-badge" style="width: 100%; margin-top: 8px; padding: 10px;">
+      <select id="estado-input" class="select-dark">
         <option value="PENDIENTE">🔴 Pendiente</option>
         <option value="PAGADO">🟢 Pagado</option>
       </select>
@@ -100,13 +119,13 @@
       <button class="btn-submit" id="btn-guardar">Subir a la nube</button>
     </div>
 
-    <!-- 5. HISTORIAL AGRUPADO -->
+    <!-- 6. HISTORIAL AGRUPADO -->
     <div class="card">
       <div class="card-header">
         <span class="card-title">Historial por Proveedor</span>
       </div>
       <p class="card-footer-desc" style="margin-top: -8px; margin-bottom: 12px;">
-        Toca el estado de una factura para alternar entre Pendiente (Rojo) y Pagado (Verde).
+        Toca el estado para alternar entre Pendiente y Pagado, o toca el nombre para ver su gráfica.
       </p>
       <div id="historial-grupos"></div>
     </div>
@@ -130,7 +149,7 @@
       <input type="hidden" id="edit-id">
 
       <label class="lbl-edit">Proveedor</label>
-      <input list="lista-proveedores-datalist" id="edit-prov">
+      <select id="edit-prov" class="select-dark"></select>
 
       <label class="lbl-edit">Monto (Q)</label>
       <input type="number" id="edit-monto" step="0.01">
@@ -139,7 +158,7 @@
       <input type="date" id="edit-fecha">
 
       <label class="lbl-edit">Estado</label>
-      <select id="edit-estado" class="select-badge" style="width: 100%; margin-top: 8px; padding: 10px;">
+      <select id="edit-estado" class="select-dark">
         <option value="PENDIENTE">🔴 Pendiente</option>
         <option value="PAGADO">🟢 Pagado</option>
       </select>

@@ -5,19 +5,20 @@ const db = window.supabase.createClient(supabaseUrl, supabaseKey);
 let selectedFile = null;
 let facturasGlobal = [];
 let proveedoresCatalogo = [];
+let chartInteractivoInstance = null;
 
 // Elementos DOM
 const inputFile = document.getElementById('input-file');
 const previewImg = document.getElementById('preview-img');
 const loader = document.getElementById('loader');
-const provInput = document.getElementById('prov-input');
+const provSelect = document.getElementById('prov-select');
 const montoInput = document.getElementById('monto-input');
 const fechaInput = document.getElementById('fecha-input');
 const estadoInput = document.getElementById('estado-input');
 const btnGuardar = document.getElementById('btn-guardar');
-const provDatalist = document.getElementById('lista-proveedores-datalist');
+const selectGraficoProv = document.getElementById('select-grafico-prov');
 
-// Filtros de gráfica
+// Filtros de fecha
 const filtroGrafica = document.getElementById('filtro-grafica');
 const contFiltroMes = document.getElementById('contenedor-filtro-mes');
 const filtroMesInput = document.getElementById('filtro-mes-input');
@@ -42,22 +43,31 @@ const btnActualizar = document.getElementById('btn-actualizar');
 // Inicializar fechas
 const hoyISO = new Date().toISOString().split('T')[0];
 fechaInput.value = hoyISO;
-filtroMesInput.value = hoyISO.slice(0, 7); // AAAA-MM
+filtroMesInput.value = hoyISO.slice(0, 7);
 filtroFechaDesde.value = hoyISO;
 filtroFechaHasta.value = hoyISO;
 
-// 1. CARGAR PROVEEDORES
+// 1. CARGAR Y POBLAR SELECTORES DE PROVEEDORES
 async function cargarProveedores() {
   const { data } = await db.from('proveedores').select('nombre').order('nombre');
   if (data) {
     proveedoresCatalogo = data.map(p => p.nombre.toUpperCase());
-    provDatalist.innerHTML = '';
-    proveedoresCatalogo.forEach(nombre => {
-      const opt = document.createElement('option');
-      opt.value = nombre;
-      provDatalist.appendChild(opt);
-    });
+    poblarSelectoresProveedores();
   }
+}
+
+function poblarSelectoresProveedores() {
+  const opcionesHTML = ['<option value="">-- Elige un Proveedor --</option>']
+    .concat(proveedoresCatalogo.map(nombre => `<option value="${nombre}">${nombre}</option>`))
+    .join('');
+
+  provSelect.innerHTML = opcionesHTML;
+  editProv.innerHTML = opcionesHTML;
+
+  // Selector del gráfico interactivo
+  selectGraficoProv.innerHTML = ['<option value="">Selecciona Proveedor...</option>']
+    .concat(proveedoresCatalogo.map(nombre => `<option value="${nombre}">${nombre}</option>`))
+    .join('');
 }
 
 // 2. CREAR PROVEEDOR MANUAL
@@ -70,11 +80,12 @@ btnCrearProv.addEventListener('click', async () => {
     alert('El proveedor ya existe o hubo un error');
   } else {
     nuevoProvNombre.value = '';
-    cargarProveedores();
+    await cargarProveedores();
+    provSelect.value = nombre;
   }
 });
 
-// 3. OCR TESSERACT
+// 3. OCR TESSERACT CON ASIGNACIÓN DIRECTA AL DESPLEGABLE
 inputFile.addEventListener('change', (e) => {
   selectedFile = e.target.files[0];
   if (!selectedFile) return;
@@ -89,18 +100,16 @@ inputFile.addEventListener('change', (e) => {
       const res = await Tesseract.recognize(reader.result, 'spa');
       const lines = res.data.text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-      const encontrada = lines.find(l => 
-        proveedoresCatalogo.some(p => l.toUpperCase().includes(p))
+      // Comparar contra los proveedores existentes en el catálogo
+      const provMatch = proveedoresCatalogo.find(p =>
+        lines.some(l => l.toUpperCase().includes(p))
       );
 
-      if (encontrada) {
-        const provMatch = proveedoresCatalogo.find(p => encontrada.toUpperCase().includes(p));
-        provInput.value = provMatch;
-      } else {
-        const provFound = lines.find(l => l.length > 3 && !/\d/.test(l));
-        if (provFound && !provInput.value) provInput.value = provFound.toUpperCase();
+      if (provMatch) {
+        provSelect.value = provMatch;
       }
 
+      // Extraer monto
       const montos = [];
       const regex = /(\d+[\.,]\d{2})/;
       lines.forEach(l => {
@@ -121,13 +130,13 @@ inputFile.addEventListener('change', (e) => {
 
 // 4. SUBIR FACTURA
 btnGuardar.addEventListener('click', async () => {
-  const prov = provInput.value.trim().toUpperCase();
+  const prov = provSelect.value;
   const monto = parseFloat(montoInput.value);
   const fecha = fechaInput.value;
   const estado = estadoInput.value;
 
   if (!prov || isNaN(monto) || !fecha) {
-    alert('Completa proveedor, monto y fecha');
+    alert('Selecciona un proveedor e ingresa monto y fecha');
     return;
   }
 
@@ -135,11 +144,6 @@ btnGuardar.addEventListener('click', async () => {
   btnGuardar.disabled = true;
 
   try {
-    if (!proveedoresCatalogo.includes(prov)) {
-      await db.from('proveedores').insert([{ nombre: prov }]);
-      cargarProveedores();
-    }
-
     let imagenUrl = '';
     if (selectedFile) {
       const extension = selectedFile.name.split('.').pop();
@@ -167,7 +171,7 @@ btnGuardar.addEventListener('click', async () => {
 
     if (insertError) throw insertError;
 
-    provInput.value = '';
+    provSelect.value = '';
     montoInput.value = '';
     previewImg.style.display = 'none';
     selectedFile = null;
@@ -180,7 +184,7 @@ btnGuardar.addEventListener('click', async () => {
   }
 });
 
-// 5. CARGAR FACTURAS
+// 5. CARGAR FACTURAS Y ACTUALIZAR COMPONENTES
 async function cargarFacturas() {
   const { data, error } = await db
     .from('facturas')
@@ -192,6 +196,14 @@ async function cargarFacturas() {
 
   actualizarGraficas();
   renderHistorialPorProveedor();
+
+  // Si hay un proveedor en el gráfico interactivo, recargarlo
+  if (selectGraficoProv.value) {
+    actualizarGraficoInteractivo(selectGraficoProv.value);
+  } else if (proveedoresCatalogo.length > 0) {
+    selectGraficoProv.value = proveedoresCatalogo[0];
+    actualizarGraficoInteractivo(proveedoresCatalogo[0]);
+  }
 }
 
 // 6. CAMBIO DE ESTADO
@@ -201,40 +213,29 @@ async function cambiarEstadoRapido(id, estadoActual) {
   if (!error) cargarFacturas();
 }
 
-// 7. GRÁFICAS Y FILTRADO AVANZADO DE FECHAS
+// 7. GRÁFICA DE BARRAS GENERAL (DIAS DE MAYOR GASTO)
 function actualizarGraficas() {
   const tipoFiltro = filtroGrafica.value;
   const hoy = new Date();
   const mesActual = hoy.getMonth();
   const anioActual = hoy.getFullYear();
 
-  // Ocultar o mostrar controles adicionales
   contFiltroMes.style.display = tipoFiltro === 'elegir_mes' ? 'block' : 'none';
   contFiltroRango.style.display = tipoFiltro === 'rango' ? 'block' : 'none';
 
   const filtradas = facturasGlobal.filter(f => {
-    const fFechaStr = f.fecha; // 'AAAA-MM-DD'
+    const fFechaStr = f.fecha;
     const d = new Date(fFechaStr + 'T00:00:00');
 
-    if (tipoFiltro === 'mes_actual') {
-      return d.getMonth() === mesActual && d.getFullYear() === anioActual;
-    }
-    if (tipoFiltro === 'elegir_mes') {
-      const mesSeleccionado = filtroMesInput.value; // 'AAAA-MM'
-      return fFechaStr.startsWith(mesSeleccionado);
-    }
+    if (tipoFiltro === 'mes_actual') return d.getMonth() === mesActual && d.getFullYear() === anioActual;
+    if (tipoFiltro === 'elegir_mes') return fFechaStr.startsWith(filtroMesInput.value);
     if (tipoFiltro === 'rango') {
       const desde = filtroFechaDesde.value;
       const hasta = filtroFechaHasta.value;
-      if (desde && hasta) {
-        return fFechaStr >= desde && fFechaStr <= hasta;
-      }
-      return true;
+      return desde && hasta ? fFechaStr >= desde && fFechaStr <= hasta : true;
     }
-    if (tipoFiltro === 'anio') {
-      return d.getFullYear() === anioActual;
-    }
-    return true; // 'todo'
+    if (tipoFiltro === 'anio') return d.getFullYear() === anioActual;
+    return true;
   });
 
   const diasNom = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -253,7 +254,6 @@ function actualizarGraficas() {
 
   document.getElementById('total-acumulado').innerText = `Q ${total.toFixed(2)}`;
 
-  // Barras
   const maxGasto = Math.max(...Object.values(gastoDias), 1);
   const ordenDias = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   const chartDiasCont = document.getElementById('chart-dias');
@@ -281,7 +281,7 @@ function actualizarGraficas() {
   } else {
     provOrdenados.slice(0, 5).forEach(([nombre, monto]) => {
       listaProvCont.innerHTML += `
-        <div class="bar-row" style="margin-bottom: 8px;">
+        <div class="bar-row" style="margin-bottom: 8px; cursor: pointer;" onclick="seleccionarProveedorYGraficar('${nombre}')">
           <span style="flex: 1; font-weight: 700; font-size: 14px;">${nombre}</span>
           <span style="font-weight: 800; font-size: 14px;">Q ${monto.toFixed(0)}</span>
         </div>
@@ -290,7 +290,85 @@ function actualizarGraficas() {
   }
 }
 
-// 8. HISTORIAL POR PROVEEDOR
+// 8. GRÁFICO INTERACTIVO ANIMADO (CHART.JS)
+function actualizarGraficoInteractivo(nombreProveedor) {
+  if (!nombreProveedor) return;
+
+  const facturasProv = facturasGlobal
+    .filter(f => f.proveedor === nombreProveedor)
+    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+
+  // Agrupar compras por fecha
+  const gastoPorDia = {};
+  let acumulado = 0;
+
+  facturasProv.forEach(f => {
+    gastoPorDia[f.fecha] = (gastoPorDia[f.fecha] || 0) + parseFloat(f.monto);
+    acumulado += parseFloat(f.monto);
+  });
+
+  document.getElementById('total-proveedor-grafico').innerText = `Total ${nombreProveedor}: Q ${acumulado.toFixed(2)}`;
+
+  const etiquetas = Object.keys(gastoPorDia);
+  const montos = Object.values(gastoPorDia);
+
+  const ctx = document.getElementById('chartProveedorInteractivo').getContext('2d');
+
+  if (chartInteractivoInstance) {
+    chartInteractivoInstance.destroy();
+  }
+
+  chartInteractivoInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: etiquetas.length > 0 ? etiquetas : ['Sin registros'],
+      datasets: [{
+        label: 'Gasto (Q)',
+        data: montos.length > 0 ? montos : [0],
+        backgroundColor: '#f7b731',
+        borderRadius: 8,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {
+        duration: 800,
+        easing: 'easeOutQuart'
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (context) => `Q ${context.parsed.y.toFixed(2)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#9ba4b0', font: { size: 10 } },
+          grid: { display: false }
+        },
+        y: {
+          ticks: { color: '#9ba4b0', font: { size: 10 } },
+          grid: { color: '#2a313a' }
+        }
+      }
+    }
+  });
+}
+
+function seleccionarProveedorYGraficar(nombre) {
+  selectGraficoProv.value = nombre;
+  actualizarGraficoInteractivo(nombre);
+}
+
+selectGraficoProv.addEventListener('change', (e) => {
+  actualizarGraficoInteractivo(e.target.value);
+});
+
+// 9. HISTORIAL AGRUPADO
 function renderHistorialPorProveedor() {
   const container = document.getElementById('historial-grupos');
   container.innerHTML = '';
@@ -356,6 +434,7 @@ function renderHistorialPorProveedor() {
       const isVisible = content.style.display === 'block';
       content.style.display = isVisible ? 'none' : 'block';
       header.querySelector('span:last-child').innerHTML = `Q ${totalProv.toFixed(2)} ${isVisible ? '▾' : '▴'}`;
+      seleccionarProveedorYGraficar(prov);
     };
 
     groupDiv.appendChild(header);
@@ -364,7 +443,7 @@ function renderHistorialPorProveedor() {
   });
 }
 
-// 9. MODAL EDITAR
+// 10. MODAL EDITAR
 function abrirEditar(id, prov, monto, fecha, estado) {
   editId.value = id;
   editProv.value = prov;
@@ -376,7 +455,7 @@ function abrirEditar(id, prov, monto, fecha, estado) {
 
 btnActualizar.addEventListener('click', async () => {
   const id = editId.value;
-  const prov = editProv.value.trim().toUpperCase();
+  const prov = editProv.value;
   const monto = parseFloat(editMonto.value);
   const fecha = editFecha.value;
   const estado = editEstado.value;
@@ -423,12 +502,11 @@ document.getElementById('btn-cerrar-editar').onclick = () => {
   modalEditar.style.display = 'none';
 };
 
-// Eventos de filtros de fechas
+// Eventos de filtros
 filtroGrafica.addEventListener('change', actualizarGraficas);
 filtroMesInput.addEventListener('change', actualizarGraficas);
 filtroFechaDesde.addEventListener('change', actualizarGraficas);
 filtroFechaHasta.addEventListener('change', actualizarGraficas);
 
 // Inicializar
-cargarProveedores();
-cargarFacturas();
+cargarProveedores().then(() => cargarFacturas());
