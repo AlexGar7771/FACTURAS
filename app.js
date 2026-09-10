@@ -48,7 +48,28 @@ filtroMesInput.value = hoyISO.slice(0, 7);
 filtroFechaDesde.value = hoyISO;
 filtroFechaHasta.value = hoyISO;
 
-// 1. CARGAR Y POBLAR SELECTORES DE PROVEEDORES
+// 1. NAVEGACIÓN ENTRE PESTAÑAS (DASHBOARD / PAGOS)
+window.cambiarPestana = function(pestana) {
+  const vistaDashboard = document.getElementById('vista-dashboard');
+  const vistaPagos = document.getElementById('vista-pagos');
+  const tabBtnDashboard = document.getElementById('tab-btn-dashboard');
+  const tabBtnPagos = document.getElementById('tab-btn-pagos');
+
+  if (pestana === 'dashboard') {
+    vistaDashboard.style.display = 'block';
+    vistaPagos.style.display = 'none';
+    tabBtnDashboard.classList.add('active');
+    tabBtnPagos.classList.remove('active');
+  } else {
+    vistaDashboard.style.display = 'none';
+    vistaPagos.style.display = 'block';
+    tabBtnDashboard.classList.remove('active');
+    tabBtnPagos.classList.add('active');
+    renderControlPagos(); // Recargar la lista de cobros pendientes
+  }
+};
+
+// 2. CARGAR Y POBLAR SELECTORES DE PROVEEDORES
 async function cargarProveedores() {
   const { data } = await db.from('proveedores').select('nombre').order('nombre');
   if (data) {
@@ -70,7 +91,7 @@ function poblarSelectoresProveedores() {
     .join('');
 }
 
-// 2. CREAR PROVEEDOR MANUAL
+// 3. CREAR PROVEEDOR MANUAL
 btnCrearProv.addEventListener('click', async () => {
   const nombre = nuevoProvNombre.value.trim().toUpperCase();
   if (!nombre) return;
@@ -85,7 +106,7 @@ btnCrearProv.addEventListener('click', async () => {
   }
 });
 
-// 3. OCR TESSERACT CON ASIGNACIÓN DIRECTA AL SELECT
+// 4. OCR TESSERACT
 inputFile.addEventListener('change', (e) => {
   selectedFile = e.target.files[0];
   if (!selectedFile) return;
@@ -100,7 +121,6 @@ inputFile.addEventListener('change', (e) => {
       const res = await Tesseract.recognize(reader.result, 'spa');
       const lines = res.data.text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-      // Comparar contra los proveedores existentes en el catálogo
       const provMatch = proveedoresCatalogo.find(p =>
         lines.some(l => l.toUpperCase().includes(p))
       );
@@ -109,7 +129,6 @@ inputFile.addEventListener('change', (e) => {
         provSelect.value = provMatch;
       }
 
-      // Extraer monto
       const montos = [];
       const regex = /(\d+[\.,]\d{2})/;
       lines.forEach(l => {
@@ -128,7 +147,7 @@ inputFile.addEventListener('change', (e) => {
   reader.readAsDataURL(selectedFile);
 });
 
-// 4. SUBIR FACTURA
+// 5. SUBIR FACTURA
 btnGuardar.addEventListener('click', async () => {
   const prov = provSelect.value;
   const monto = parseFloat(montoInput.value);
@@ -184,7 +203,7 @@ btnGuardar.addEventListener('click', async () => {
   }
 });
 
-// 5. CARGAR FACTURAS Y ACTUALIZAR COMPONENTES
+// 6. CARGAR FACTURAS DESDE SUPABASE
 async function cargarFacturas() {
   const { data, error } = await db
     .from('facturas')
@@ -196,6 +215,7 @@ async function cargarFacturas() {
 
   actualizarGraficas();
   renderHistorialPorProveedor();
+  renderControlPagos();
 
   if (selectGraficoProv.value) {
     actualizarGraficoInteractivo(selectGraficoProv.value);
@@ -205,14 +225,71 @@ async function cargarFacturas() {
   }
 }
 
-// 6. CAMBIO DE ESTADO
+// 7. BANDEJA EXCLUSIVA: CONTROL DE PAGOS
+function renderControlPagos() {
+  const listaCont = document.getElementById('lista-cobros-pendientes');
+  if (!listaCont) return;
+  listaCont.innerHTML = '';
+
+  const pendientes = facturasGlobal.filter(f => (f.estado || 'PENDIENTE') === 'PENDIENTE');
+  const totalDinero = pendientes.reduce((acc, curr) => acc + parseFloat(curr.monto), 0);
+
+  document.getElementById('total-pendiente-dinero').innerText = `Q ${totalDinero.toFixed(2)}`;
+  document.getElementById('badge-contador-pendientes').innerText = `${pendientes.length} Facturas`;
+
+  if (pendientes.length === 0) {
+    listaCont.innerHTML = `
+      <div style="text-align: center; padding: 24px 10px;">
+        <span style="font-size: 32px;">🎉</span>
+        <p style="color: #4ade80; font-weight: 700; margin-top: 8px;">¡Al día! No hay facturas pendientes de pago.</p>
+      </div>
+    `;
+    return;
+  }
+
+  pendientes.forEach(f => {
+    const item = document.createElement('div');
+    item.className = 'factura-subitem';
+    item.style.padding = '12px 0';
+
+    const imgHtml = f.imagen_url 
+      ? `<img src="${f.imagen_url}" class="thumb-img" onclick="verDetalleFoto('${f.imagen_url}', '${f.proveedor}', '${f.monto}', '${f.fecha}')">`
+      : `<div class="thumb-img" style="display:grid;place-items:center;color:var(--text-muted);">🧾</div>`;
+
+    item.innerHTML = `
+      ${imgHtml}
+      <div style="flex: 1;">
+        <div style="font-size: 14px; font-weight: 800; color: #fff;">${f.proveedor}</div>
+        <div style="font-size: 11px; color: var(--text-muted);">${f.fecha}</div>
+      </div>
+      <div style="font-size: 14px; font-weight: 800; color: #f87171; margin-right: 8px;">Q ${parseFloat(f.monto).toFixed(2)}</div>
+      <button class="btn-marcar-pagado" onclick="marcarComoPagadoDesdePanel(${f.id}, '${f.proveedor}', ${f.monto})">✔ Pagar</button>
+    `;
+    listaCont.appendChild(item);
+  });
+}
+
+// Acción directa para el encargado de pagos
+window.marcarComoPagadoDesdePanel = async function(id, prov, monto) {
+  const confirmar = confirm(`¿Confirmas que ya realizaste el pago de Q ${parseFloat(monto).toFixed(2)} a ${prov}?`);
+  if (!confirmar) return;
+
+  const { error } = await db.from('facturas').update({ estado: 'PAGADO' }).eq('id', id);
+  if (!error) {
+    cargarFacturas();
+  } else {
+    alert('Error al actualizar el pago: ' + error.message);
+  }
+};
+
+// 8. ALTERNAR ESTADO RÁPIDO (DESDE EL HISTORIAL)
 async function cambiarEstadoRapido(id, estadoActual) {
   const nuevoEstado = estadoActual === 'PAGADO' ? 'PENDIENTE' : 'PAGADO';
   const { error } = await db.from('facturas').update({ estado: nuevoEstado }).eq('id', id);
   if (!error) cargarFacturas();
 }
 
-// 7. GRÁFICA DE BARRAS GENERAL (DIAS DE MAYOR GASTO)
+// 9. GRÁFICA DE BARRAS GENERAL
 function actualizarGraficas() {
   const tipoFiltro = filtroGrafica.value;
   const hoy = new Date();
@@ -289,7 +366,7 @@ function actualizarGraficas() {
   }
 }
 
-// 8. GRÁFICO INTERACTIVO ANIMADO (CHART.JS)
+// 10. GRÁFICO ANIMADO POR PROVEEDOR
 function actualizarGraficoInteractivo(nombreProveedor) {
   if (!nombreProveedor) return;
 
@@ -331,27 +408,16 @@ function actualizarGraficoInteractivo(nombreProveedor) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      animation: {
-        duration: 800,
-        easing: 'easeOutQuart'
-      },
+      animation: { duration: 800, easing: 'easeOutQuart' },
       plugins: {
         legend: { display: false },
         tooltip: {
-          callbacks: {
-            label: (context) => `Q ${context.parsed.y.toFixed(2)}`
-          }
+          callbacks: { label: (c) => `Q ${c.parsed.y.toFixed(2)}` }
         }
       },
       scales: {
-        x: {
-          ticks: { color: '#9ba4b0', font: { size: 10 } },
-          grid: { display: false }
-        },
-        y: {
-          ticks: { color: '#9ba4b0', font: { size: 10 } },
-          grid: { color: '#2a313a' }
-        }
+        x: { ticks: { color: '#9ba4b0', font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: '#9ba4b0', font: { size: 10 } }, grid: { color: '#2a313a' } }
       }
     }
   });
@@ -366,7 +432,7 @@ selectGraficoProv.addEventListener('change', (e) => {
   actualizarGraficoInteractivo(e.target.value);
 });
 
-// 9. HISTORIAL AGRUPADO CON BOTONES DE EDICIÓN Y BORRADO
+// 11. HISTORIAL AGRUPADO
 function renderHistorialPorProveedor() {
   const container = document.getElementById('historial-grupos');
   container.innerHTML = '';
@@ -442,10 +508,9 @@ function renderHistorialPorProveedor() {
   });
 }
 
-// 10. ELIMINAR FACTURA CON CONTRASEÑA DE SEGURIDAD
+// 12. BORRADO CON CONTRASEÑA
 async function eliminarFacturaSegura(id, prov, monto) {
-  const claveIngresada = prompt(`Seguridad requerida para eliminar factura de ${prov} por Q ${parseFloat(monto).toFixed(2)}:\n\nIngresa la contraseña de administrador:`);
-  
+  const claveIngresada = prompt(`Seguridad requerida para eliminar factura de ${prov} por Q ${parseFloat(monto).toFixed(2)}:\n\nIngresa la contraseña:`);
   if (claveIngresada === null) return;
 
   if (claveIngresada !== 'Lura2026.') {
@@ -467,7 +532,7 @@ async function eliminarFacturaSegura(id, prov, monto) {
   }
 }
 
-// 11. MODAL EDITAR
+// 13. MODAL EDITAR
 function abrirEditar(id, prov, monto, fecha, estado) {
   editId.value = id;
   editProv.value = prov;

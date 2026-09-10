@@ -7,7 +7,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   
-  <!-- Supabase CDN, Chart.js para gráficos interactivos y Tesseract OCR -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
@@ -16,118 +15,148 @@
 
   <div class="container">
     
-    <!-- 1. GESTIÓN MANUAL DE PROVEEDORES -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Catálogo de Proveedores</span>
-      </div>
-      <div style="display: flex; gap: 8px;">
-        <input type="text" id="nuevo-prov-nombre" placeholder="Nuevo proveedor (Ej: Bimbo)" style="margin-top: 0;">
-        <button class="btn-submit" id="btn-crear-prov" style="margin-top: 0; width: auto; padding: 0 16px;">Agregar</button>
-      </div>
+    <!-- BARRA DE PESTAÑAS PRINCIPAL -->
+    <div class="tab-nav">
+      <button class="tab-btn active" id="tab-btn-dashboard" onclick="cambiarPestana('dashboard')">📊 Dashboard</button>
+      <button class="tab-btn" id="tab-btn-pagos" onclick="cambiarPestana('pagos')">💳 Control de Pagos</button>
     </div>
 
-    <!-- 2. GRÁFICAS DE GASTO GENERAL -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Días de Mayor Gasto</span>
-        <select id="filtro-grafica" class="select-badge">
-          <option value="mes_actual">Este Mes</option>
-          <option value="elegir_mes">Elegir Mes...</option>
-          <option value="rango">Rango de Fechas...</option>
-          <option value="anio">Este Año</option>
-          <option value="todo">Todo el tiempo</option>
-        </select>
-      </div>
-
-      <div id="contenedor-filtro-mes" style="display: none; margin-bottom: 12px;">
-        <label class="lbl-edit" style="margin-top: 0;">Selecciona el Mes:</label>
-        <input type="month" id="filtro-mes-input">
-      </div>
-
-      <div id="contenedor-filtro-rango" style="display: none; margin-bottom: 12px;">
+    <!-- ================= PESTAÑA 1: DASHBOARD ================= -->
+    <div id="vista-dashboard">
+      
+      <!-- 1. GESTIÓN MANUAL DE PROVEEDORES -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Catálogo de Proveedores</span>
+        </div>
         <div style="display: flex; gap: 8px;">
-          <div style="flex: 1;">
-            <label class="lbl-edit" style="margin-top: 0;">Desde:</label>
-            <input type="date" id="filtro-fecha-desde">
-          </div>
-          <div style="flex: 1;">
-            <label class="lbl-edit" style="margin-top: 0;">Hasta:</label>
-            <input type="date" id="filtro-fecha-hasta">
-          </div>
+          <input type="text" id="nuevo-prov-nombre" placeholder="Nuevo proveedor (Ej: Bimbo)" style="margin-top: 0;">
+          <button class="btn-submit" id="btn-crear-prov" style="margin-top: 0; width: auto; padding: 0 16px;">Agregar</button>
         </div>
       </div>
 
-      <div id="chart-dias"></div>
-      <p class="card-footer-desc">Distribución de compras por día según el periodo seleccionado.</p>
-    </div>
+      <!-- 2. GRÁFICAS GENERALES -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Días de Mayor Gasto</span>
+          <select id="filtro-grafica" class="select-badge">
+            <option value="mes_actual">Este Mes</option>
+            <option value="elegir_mes">Elegir Mes...</option>
+            <option value="rango">Rango de Fechas...</option>
+            <option value="anio">Este Año</option>
+            <option value="todo">Todo el tiempo</option>
+          </select>
+        </div>
 
-    <!-- 3. GRÁFICO INTERACTIVO ANIMADO POR PROVEEDOR -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Análisis por Proveedor</span>
-        <select id="select-grafico-prov" class="select-badge" style="max-width: 170px;">
-          <option value="">Selecciona...</option>
+        <div id="contenedor-filtro-mes" style="display: none; margin-bottom: 12px;">
+          <label class="lbl-edit" style="margin-top: 0;">Selecciona el Mes:</label>
+          <input type="month" id="filtro-mes-input">
+        </div>
+
+        <div id="contenedor-filtro-rango" style="display: none; margin-bottom: 12px;">
+          <div style="display: flex; gap: 8px;">
+            <div style="flex: 1;">
+              <label class="lbl-edit" style="margin-top: 0;">Desde:</label>
+              <input type="date" id="filtro-fecha-desde">
+            </div>
+            <div style="flex: 1;">
+              <label class="lbl-edit" style="margin-top: 0;">Hasta:</label>
+              <input type="date" id="filtro-fecha-hasta">
+            </div>
+          </div>
+        </div>
+
+        <div id="chart-dias"></div>
+        <p class="card-footer-desc">Distribución de compras por día según el periodo seleccionado.</p>
+      </div>
+
+      <!-- 3. GRÁFICO INTERACTIVO POR PROVEEDOR -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Análisis por Proveedor</span>
+          <select id="select-grafico-prov" class="select-badge" style="max-width: 170px;">
+            <option value="">Selecciona...</option>
+          </select>
+        </div>
+        <div style="position: relative; height: 220px; width: 100%;">
+          <canvas id="chartProveedorInteractivo"></canvas>
+        </div>
+        <p id="total-proveedor-grafico" class="card-footer-desc" style="text-align: right; font-weight: 700; color: var(--accent);">
+          Total: Q 0.00
+        </p>
+      </div>
+
+      <!-- 4. RANKING -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Ranking Proveedores</span>
+          <span class="tag-badge" id="total-acumulado">Q 0.00</span>
+        </div>
+        <div id="lista-proveedores-top"></div>
+      </div>
+
+      <!-- 5. REGISTRAR FACTURA -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Registrar Factura</span>
+        </div>
+
+        <label for="input-file" class="btn-camera">📸 Foto Factura (OCR)</label>
+        <input type="file" id="input-file" accept="image/*" capture="environment">
+        <img id="preview-img" alt="Vista previa">
+        <p id="loader">Leyendo datos con OCR...</p>
+
+        <label class="lbl-edit">Proveedor</label>
+        <select id="prov-select" class="select-dark">
+          <option value="">-- Elige un Proveedor --</option>
         </select>
+
+        <label class="lbl-edit">Monto (Q)</label>
+        <input type="number" id="monto-input" step="0.01" placeholder="0.00">
+
+        <label class="lbl-edit">Fecha</label>
+        <input type="date" id="fecha-input">
+
+        <label class="lbl-edit">Estado Inicial</label>
+        <select id="estado-input" class="select-dark">
+          <option value="PENDIENTE">🔴 Pendiente</option>
+          <option value="PAGADO">🟢 Pagado</option>
+        </select>
+
+        <button class="btn-submit" id="btn-guardar">Subir a la nube</button>
       </div>
-      <div style="position: relative; height: 220px; width: 100%;">
-        <canvas id="chartProveedorInteractivo"></canvas>
+
+      <!-- 6. HISTORIAL COMPLETO -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Historial por Proveedor</span>
+        </div>
+        <div id="historial-grupos"></div>
       </div>
-      <p id="total-proveedor-grafico" class="card-footer-desc" style="text-align: right; font-weight: 700; color: var(--accent);">
-        Total: Q 0.00
-      </p>
+
     </div>
 
-    <!-- 4. RANKING DE PROVEEDORES -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Ranking Proveedores</span>
-        <span class="tag-badge" id="total-acumulado">Q 0.00</span>
-      </div>
-      <div id="lista-proveedores-top"></div>
-    </div>
-
-    <!-- 5. REGISTRAR FACTURA -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Registrar Factura</span>
+    <!-- ================= PESTAÑA 2: CONTROL DE PAGOS ================= -->
+    <div id="vista-pagos" style="display: none;">
+      
+      <!-- TARJETA RESUMEN PENDIENTE -->
+      <div class="card" style="border: 1px solid rgba(239, 68, 68, 0.4); background: linear-gradient(180deg, #1e2328 0%, #20181a 100%);">
+        <div class="card-header">
+          <span class="card-title" style="color: #f87171;">Total Pendiente de Pago</span>
+          <span class="tag-badge" id="badge-contador-pendientes" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">0 Facturas</span>
+        </div>
+        <h2 id="total-pendiente-dinero" style="font-size: 28px; font-weight: 800; color: #fff; margin: 4px 0 10px;">Q 0.00</h2>
+        <p class="card-footer-desc">Revisa el recibo y presiona el botón verde cuando se haya efectuado la transferencia o pago.</p>
       </div>
 
-      <label for="input-file" class="btn-camera">📸 Foto Factura (OCR)</label>
-      <input type="file" id="input-file" accept="image/*" capture="environment">
-      <img id="preview-img" alt="Vista previa">
-      <p id="loader">Leyendo datos con OCR...</p>
-
-      <!-- Menú desplegable nativo para seleccionar proveedor -->
-      <label class="lbl-edit">Proveedor</label>
-      <select id="prov-select" class="select-dark">
-        <option value="">-- Elige un Proveedor --</option>
-      </select>
-
-      <label class="lbl-edit">Monto (Q)</label>
-      <input type="number" id="monto-input" step="0.01" placeholder="0.00">
-
-      <label class="lbl-edit">Fecha</label>
-      <input type="date" id="fecha-input">
-
-      <label class="lbl-edit">Estado Inicial</label>
-      <select id="estado-input" class="select-dark">
-        <option value="PENDIENTE">🔴 Pendiente</option>
-        <option value="PAGADO">🟢 Pagado</option>
-      </select>
-
-      <button class="btn-submit" id="btn-guardar">Subir a la nube</button>
-    </div>
-
-    <!-- 6. HISTORIAL AGRUPADO -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Historial por Proveedor</span>
+      <!-- LISTA DE COBRO PENDIENTE -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Facturas por Liquidar</span>
+        </div>
+        <div id="lista-cobros-pendientes"></div>
       </div>
-      <p class="card-footer-desc" style="margin-top: -8px; margin-bottom: 12px;">
-        Toca el estado para alternar entre Pendiente y Pagado, o toca el nombre para ver su gráfica.
-      </p>
-      <div id="historial-grupos"></div>
+
     </div>
 
   </div>
