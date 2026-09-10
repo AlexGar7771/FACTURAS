@@ -1,3 +1,4 @@
+// CREDENCIALES CONFIGURADAS DE SUPABASE
 const supabaseUrl = 'https://cdblyqtxpuxnhwbxykfh.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkYmx5cXR4cHV4bmh3Ynh5a2ZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMDgxMjksImV4cCI6MjA5OTc4NDEyOX0.XMozUuwLYLz3vB8UokwLNX-E-wJZr4QdVnkcVynvnjk';
 const db = window.supabase.createClient(supabaseUrl, supabaseKey);
@@ -64,7 +65,6 @@ function poblarSelectoresProveedores() {
   provSelect.innerHTML = opcionesHTML;
   editProv.innerHTML = opcionesHTML;
 
-  // Selector del gráfico interactivo
   selectGraficoProv.innerHTML = ['<option value="">Selecciona Proveedor...</option>']
     .concat(proveedoresCatalogo.map(nombre => `<option value="${nombre}">${nombre}</option>`))
     .join('');
@@ -85,7 +85,7 @@ btnCrearProv.addEventListener('click', async () => {
   }
 });
 
-// 3. OCR TESSERACT CON ASIGNACIÓN DIRECTA AL DESPLEGABLE
+// 3. OCR TESSERACT CON ASIGNACIÓN DIRECTA AL SELECT
 inputFile.addEventListener('change', (e) => {
   selectedFile = e.target.files[0];
   if (!selectedFile) return;
@@ -197,7 +197,6 @@ async function cargarFacturas() {
   actualizarGraficas();
   renderHistorialPorProveedor();
 
-  // Si hay un proveedor en el gráfico interactivo, recargarlo
   if (selectGraficoProv.value) {
     actualizarGraficoInteractivo(selectGraficoProv.value);
   } else if (proveedoresCatalogo.length > 0) {
@@ -298,7 +297,6 @@ function actualizarGraficoInteractivo(nombreProveedor) {
     .filter(f => f.proveedor === nombreProveedor)
     .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
 
-  // Agrupar compras por fecha
   const gastoPorDia = {};
   let acumulado = 0;
 
@@ -368,7 +366,7 @@ selectGraficoProv.addEventListener('change', (e) => {
   actualizarGraficoInteractivo(e.target.value);
 });
 
-// 9. HISTORIAL AGRUPADO
+// 9. HISTORIAL AGRUPADO CON BOTONES DE EDICIÓN Y BORRADO
 function renderHistorialPorProveedor() {
   const container = document.getElementById('historial-grupos');
   container.innerHTML = '';
@@ -425,12 +423,13 @@ function renderHistorialPorProveedor() {
         </div>
         <span class="badge-status ${claseEstado}" onclick="cambiarEstadoRapido(${f.id}, '${estadoActual}')">${textoEstado}</span>
         <button class="btn-edit" onclick="abrirEditar(${f.id}, '${f.proveedor}', ${f.monto}, '${f.fecha}', '${estadoActual}')">✏️</button>
+        <button class="btn-delete" onclick="eliminarFacturaSegura(${f.id}, '${f.proveedor}', ${f.monto})">🗑️</button>
       `;
       content.appendChild(subItem);
     });
 
     header.onclick = (e) => {
-      if (e.target.closest('.badge-status') || e.target.closest('.btn-edit')) return;
+      if (e.target.closest('.badge-status') || e.target.closest('.btn-edit') || e.target.closest('.btn-delete')) return;
       const isVisible = content.style.display === 'block';
       content.style.display = isVisible ? 'none' : 'block';
       header.querySelector('span:last-child').innerHTML = `Q ${totalProv.toFixed(2)} ${isVisible ? '▾' : '▴'}`;
@@ -443,7 +442,32 @@ function renderHistorialPorProveedor() {
   });
 }
 
-// 10. MODAL EDITAR
+// 10. ELIMINAR FACTURA CON CONTRASEÑA DE SEGURIDAD
+async function eliminarFacturaSegura(id, prov, monto) {
+  const claveIngresada = prompt(`Seguridad requerida para eliminar factura de ${prov} por Q ${parseFloat(monto).toFixed(2)}:\n\nIngresa la contraseña de administrador:`);
+  
+  if (claveIngresada === null) return;
+
+  if (claveIngresada !== 'Lura2026.') {
+    alert('Contraseña incorrecta. No tienes permisos para borrar esta factura.');
+    return;
+  }
+
+  const confirmar = confirm(`¿Estás 100% seguro de borrar permanentemente esta factura de ${prov}?`);
+  if (!confirmar) return;
+
+  try {
+    const { error } = await db.from('facturas').delete().eq('id', id);
+    if (error) throw error;
+
+    alert('Factura eliminada con éxito.');
+    cargarFacturas();
+  } catch (err) {
+    alert('Error al eliminar: ' + err.message);
+  }
+}
+
+// 11. MODAL EDITAR
 function abrirEditar(id, prov, monto, fecha, estado) {
   editId.value = id;
   editProv.value = prov;
@@ -486,7 +510,7 @@ btnActualizar.addEventListener('click', async () => {
   }
 });
 
-// MODALES
+// MODAL VISOR FOTO
 function verDetalleFoto(url, prov, monto, fecha) {
   document.getElementById('modal-img').src = url;
   document.getElementById('modal-text').innerText = `${prov} — Q ${parseFloat(monto).toFixed(2)} (${fecha})`;

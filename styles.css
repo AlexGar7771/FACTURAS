@@ -278,3 +278,16 @@ input:focus { border-color: var(--accent); }
 .select-dark:focus {
   border-color: var(--accent);
 }
+.btn-delete {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s ease;
+}
+.btn-delete:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
