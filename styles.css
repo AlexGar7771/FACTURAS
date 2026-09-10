@@ -335,3 +335,15 @@ input:focus { border-color: var(--accent); }
 .btn-marcar-pagado:hover {
   background: rgba(34, 197, 94, 0.35);
 }
+/* Cabecera superior con navegación y selector de idioma */
+.top-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.lang-switch {
+  display: flex;
+  align-items: center;
+}

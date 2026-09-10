@@ -15,10 +15,20 @@
 
   <div class="container">
     
-    <!-- BARRA DE PESTAÑAS PRINCIPAL -->
-    <div class="tab-nav">
-      <button class="tab-btn active" id="tab-btn-dashboard" onclick="cambiarPestana('dashboard')">📊 Dashboard</button>
-      <button class="tab-btn" id="tab-btn-pagos" onclick="cambiarPestana('pagos')">💳 Control de Pagos</button>
+    <!-- BARRA SUPERIOR CON SELECTOR DE IDIOMA -->
+    <div class="top-header">
+      <div class="tab-nav" style="margin-bottom: 0; flex: 1;">
+        <button class="tab-btn active" id="tab-btn-dashboard" onclick="cambiarPestana('dashboard')">📊 Dashboard</button>
+        <button class="tab-btn" id="tab-btn-pagos" onclick="cambiarPestana('pagos')">💳 Control de Pagos</button>
+      </div>
+
+      <!-- Selector de Idioma -->
+      <div class="lang-switch">
+        <select id="select-lang" class="select-badge" style="height: 100%; padding: 8px 12px; font-size: 12px;">
+          <option value="es">🇪🇸 ES</option>
+          <option value="en">🇺🇸 EN</option>
+        </select>
+      </div>
     </div>
 
     <!-- ================= PESTAÑA 1: DASHBOARD ================= -->
@@ -27,55 +37,55 @@
       <!-- 1. GESTIÓN MANUAL DE PROVEEDORES -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Catálogo de Proveedores</span>
+          <span class="card-title" data-i18n="cat_title">Catálogo de Proveedores</span>
         </div>
         <div style="display: flex; gap: 8px;">
-          <input type="text" id="nuevo-prov-nombre" placeholder="Nuevo proveedor (Ej: Bimbo)" style="margin-top: 0;">
-          <button class="btn-submit" id="btn-crear-prov" style="margin-top: 0; width: auto; padding: 0 16px;">Agregar</button>
+          <input type="text" id="nuevo-prov-nombre" placeholder="Nuevo proveedor (Ej: Bimbo)" style="margin-top: 0;" data-i18n-ph="prov_placeholder">
+          <button class="btn-submit" id="btn-crear-prov" style="margin-top: 0; width: auto; padding: 0 16px;" data-i18n="btn_add">Agregar</button>
         </div>
       </div>
 
       <!-- 2. GRÁFICAS GENERALES -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Días de Mayor Gasto</span>
+          <span class="card-title" data-i18n="chart_title">Días de Mayor Gasto</span>
           <select id="filtro-grafica" class="select-badge">
-            <option value="mes_actual">Este Mes</option>
-            <option value="elegir_mes">Elegir Mes...</option>
-            <option value="rango">Rango de Fechas...</option>
-            <option value="anio">Este Año</option>
-            <option value="todo">Todo el tiempo</option>
+            <option value="mes_actual" data-i18n="opt_current_month">Este Mes</option>
+            <option value="elegir_mes" data-i18n="opt_pick_month">Elegir Mes...</option>
+            <option value="rango" data-i18n="opt_range">Rango de Fechas...</option>
+            <option value="anio" data-i18n="opt_year">Este Año</option>
+            <option value="todo" data-i18n="opt_all">Todo el tiempo</option>
           </select>
         </div>
 
         <div id="contenedor-filtro-mes" style="display: none; margin-bottom: 12px;">
-          <label class="lbl-edit" style="margin-top: 0;">Selecciona el Mes:</label>
+          <label class="lbl-edit" style="margin-top: 0;" data-i18n="lbl_select_month">Selecciona el Mes:</label>
           <input type="month" id="filtro-mes-input">
         </div>
 
         <div id="contenedor-filtro-rango" style="display: none; margin-bottom: 12px;">
           <div style="display: flex; gap: 8px;">
             <div style="flex: 1;">
-              <label class="lbl-edit" style="margin-top: 0;">Desde:</label>
+              <label class="lbl-edit" style="margin-top: 0;" data-i18n="lbl_from">Desde:</label>
               <input type="date" id="filtro-fecha-desde">
             </div>
             <div style="flex: 1;">
-              <label class="lbl-edit" style="margin-top: 0;">Hasta:</label>
+              <label class="lbl-edit" style="margin-top: 0;" data-i18n="lbl_to">Hasta:</label>
               <input type="date" id="filtro-fecha-hasta">
             </div>
           </div>
         </div>
 
         <div id="chart-dias"></div>
-        <p class="card-footer-desc">Distribución de compras por día según el periodo seleccionado.</p>
+        <p class="card-footer-desc" data-i18n="chart_desc">Distribución de compras por día según el periodo seleccionado.</p>
       </div>
 
       <!-- 3. GRÁFICO INTERACTIVO POR PROVEEDOR -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Análisis por Proveedor</span>
+          <span class="card-title" data-i18n="analysis_title">Análisis por Proveedor</span>
           <select id="select-grafico-prov" class="select-badge" style="max-width: 170px;">
-            <option value="">Selecciona...</option>
+            <option value="" data-i18n="opt_select">Selecciona...</option>
           </select>
         </div>
         <div style="position: relative; height: 220px; width: 100%;">
@@ -89,7 +99,7 @@
       <!-- 4. RANKING -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Ranking Proveedores</span>
+          <span class="card-title" data-i18n="ranking_title">Ranking Proveedores</span>
           <span class="tag-badge" id="total-acumulado">Q 0.00</span>
         </div>
         <div id="lista-proveedores-top"></div>
@@ -98,38 +108,38 @@
       <!-- 5. REGISTRAR FACTURA -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Registrar Factura</span>
+          <span class="card-title" data-i18n="register_title">Registrar Factura</span>
         </div>
 
-        <label for="input-file" class="btn-camera">📸 Foto Factura (OCR)</label>
+        <label for="input-file" class="btn-camera" data-i18n="btn_photo">📸 Foto Factura (OCR)</label>
         <input type="file" id="input-file" accept="image/*" capture="environment">
         <img id="preview-img" alt="Vista previa">
-        <p id="loader">Leyendo datos con OCR...</p>
+        <p id="loader" data-i18n="ocr_loading">Leyendo datos con OCR...</p>
 
-        <label class="lbl-edit">Proveedor</label>
+        <label class="lbl-edit" data-i18n="lbl_supplier">Proveedor</label>
         <select id="prov-select" class="select-dark">
           <option value="">-- Elige un Proveedor --</option>
         </select>
 
-        <label class="lbl-edit">Monto (Q)</label>
+        <label class="lbl-edit" data-i18n="lbl_amount">Monto (Q)</label>
         <input type="number" id="monto-input" step="0.01" placeholder="0.00">
 
-        <label class="lbl-edit">Fecha</label>
+        <label class="lbl-edit" data-i18n="lbl_date">Fecha</label>
         <input type="date" id="fecha-input">
 
-        <label class="lbl-edit">Estado Inicial</label>
+        <label class="lbl-edit" data-i18n="lbl_status">Estado Inicial</label>
         <select id="estado-input" class="select-dark">
-          <option value="PENDIENTE">🔴 Pendiente</option>
-          <option value="PAGADO">🟢 Pagado</option>
+          <option value="PENDIENTE" data-i18n="opt_pending">🔴 Pendiente</option>
+          <option value="PAGADO" data-i18n="opt_paid">🟢 Pagado</option>
         </select>
 
-        <button class="btn-submit" id="btn-guardar">Subir a la nube</button>
+        <button class="btn-submit" id="btn-guardar" data-i18n="btn_upload">Subir a la nube</button>
       </div>
 
       <!-- 6. HISTORIAL COMPLETO -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Historial por Proveedor</span>
+          <span class="card-title" data-i18n="history_title">Historial por Proveedor</span>
         </div>
         <div id="historial-grupos"></div>
       </div>
@@ -142,17 +152,17 @@
       <!-- TARJETA RESUMEN PENDIENTE -->
       <div class="card" style="border: 1px solid rgba(239, 68, 68, 0.4); background: linear-gradient(180deg, #1e2328 0%, #20181a 100%);">
         <div class="card-header">
-          <span class="card-title" style="color: #f87171;">Total Pendiente de Pago</span>
+          <span class="card-title" style="color: #f87171;" data-i18n="pending_total_title">Total Pendiente de Pago</span>
           <span class="tag-badge" id="badge-contador-pendientes" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">0 Facturas</span>
         </div>
         <h2 id="total-pendiente-dinero" style="font-size: 28px; font-weight: 800; color: #fff; margin: 4px 0 10px;">Q 0.00</h2>
-        <p class="card-footer-desc">Revisa el recibo y presiona el botón verde cuando se haya efectuado la transferencia o pago.</p>
+        <p class="card-footer-desc" data-i18n="pending_desc">Revisa el recibo y presiona el botón verde cuando se haya efectuado la transferencia o pago.</p>
       </div>
 
       <!-- LISTA DE COBRO PENDIENTE -->
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Facturas por Liquidar</span>
+          <span class="card-title" data-i18n="unpaid_title">Facturas por Liquidar</span>
         </div>
         <div id="lista-cobros-pendientes"></div>
       </div>
@@ -172,27 +182,27 @@
   <div id="modal-editar" class="modal">
     <div class="modal-card">
       <div class="card-header">
-        <span class="card-title">Editar Factura</span>
+        <span class="card-title" data-i18n="edit_title">Editar Factura</span>
         <button class="btn-close-inline" id="btn-cerrar-editar">✕</button>
       </div>
       <input type="hidden" id="edit-id">
 
-      <label class="lbl-edit">Proveedor</label>
+      <label class="lbl-edit" data-i18n="lbl_supplier">Proveedor</label>
       <select id="edit-prov" class="select-dark"></select>
 
-      <label class="lbl-edit">Monto (Q)</label>
+      <label class="lbl-edit" data-i18n="lbl_amount">Monto (Q)</label>
       <input type="number" id="edit-monto" step="0.01">
 
-      <label class="lbl-edit">Fecha</label>
+      <label class="lbl-edit" data-i18n="lbl_date">Fecha</label>
       <input type="date" id="edit-fecha">
 
-      <label class="lbl-edit">Estado</label>
+      <label class="lbl-edit" data-i18n="lbl_status">Estado</label>
       <select id="edit-estado" class="select-dark">
-        <option value="PENDIENTE">🔴 Pendiente</option>
-        <option value="PAGADO">🟢 Pagado</option>
+        <option value="PENDIENTE" data-i18n="opt_pending">🔴 Pendiente</option>
+        <option value="PAGADO" data-i18n="opt_paid">🟢 Pagado</option>
       </select>
 
-      <button class="btn-submit" id="btn-actualizar" style="margin-top: 16px;">Guardar Cambios</button>
+      <button class="btn-submit" id="btn-actualizar" style="margin-top: 16px;" data-i18n="btn_save_changes">Guardar Cambios</button>
     </div>
   </div>
 
