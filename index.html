@@ -7,24 +7,28 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   
-  <!-- Librería de Supabase (OBLIGATORIA para app.js) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- OCR Tesseract -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 
   <div class="container">
-    <!-- DÍAS DE GASTO -->
+    
+    <!-- 1. GRÁFICAS CON SELECTOR DE TIEMPO -->
     <div class="card">
       <div class="card-header">
         <span class="card-title">Días de Mayor Gasto</span>
-        <span class="tag-badge">En la nube ☁️</span>
+        <select id="filtro-grafica" class="select-badge">
+          <option value="mes">Este Mes</option>
+          <option value="anio">Este Año</option>
+          <option value="todo">Todo el tiempo</option>
+        </select>
       </div>
       <div id="chart-dias"></div>
+      <p class="card-footer-desc">Distribución de compras por día según el periodo seleccionado.</p>
     </div>
 
-    <!-- RANKING PROVEEDORES -->
+    <!-- 2. RANKING DE PROVEEDORES -->
     <div class="card">
       <div class="card-header">
         <span class="card-title">Ranking Proveedores</span>
@@ -33,7 +37,7 @@
       <div id="lista-proveedores-top"></div>
     </div>
 
-    <!-- FORMULARIO -->
+    <!-- 3. FORMULARIO REGISTRO -->
     <div class="card">
       <div class="card-header">
         <span class="card-title">Registrar Factura</span>
@@ -42,29 +46,52 @@
       <label for="input-file" class="btn-camera">📸 Foto Factura (OCR)</label>
       <input type="file" id="input-file" accept="image/*" capture="environment">
       <img id="preview-img" alt="Vista previa">
-      <p id="loader">Leyendo texto...</p>
+      <p id="loader">Leyendo datos con OCR...</p>
 
-      <input type="text" id="prov-input" placeholder="Proveedor">
+      <input type="text" id="prov-input" placeholder="Proveedor (Ej: Bimbo)">
       <input type="number" id="monto-input" step="0.01" placeholder="Monto (Q)">
       <input type="date" id="fecha-input">
 
       <button class="btn-submit" id="btn-guardar">Subir a la nube</button>
     </div>
 
-    <!-- HISTORIAL CON FOTOS -->
+    <!-- 4. HISTORIAL AGRUPADO POR PROVEEDOR (ACORDEÓN) -->
     <div class="card">
       <div class="card-header">
-        <span class="card-title">Historial Global</span>
+        <span class="card-title">Historial por Proveedor</span>
       </div>
-      <div id="historial-facturas"></div>
+      <p class="card-footer-desc" style="margin-top: -8px; margin-bottom: 12px;">
+        Toca un proveedor para desplegar su lista de facturas.
+      </p>
+      <div id="historial-grupos"></div>
     </div>
+
   </div>
 
-  <!-- MODAL VISOR -->
+  <!-- MODAL: VISOR DE FOTO -->
   <div id="modal-visor" class="modal">
     <button class="btn-close" id="btn-cerrar-modal">✕</button>
     <img id="modal-img" class="modal-content" src="" alt="Factura Detalle">
     <div id="modal-text" class="modal-info"></div>
+  </div>
+
+  <!-- MODAL: EDITAR FACTURA -->
+  <div id="modal-editar" class="modal">
+    <div class="modal-card">
+      <div class="card-header">
+        <span class="card-title">Editar Factura</span>
+        <button class="btn-close-inline" id="btn-cerrar-editar">✕</button>
+      </div>
+      <input type="hidden" id="edit-id">
+      <label class="lbl-edit">Proveedor</label>
+      <input type="text" id="edit-prov">
+      <label class="lbl-edit">Monto (Q)</label>
+      <input type="number" id="edit-monto" step="0.01">
+      <label class="lbl-edit">Fecha</label>
+      <input type="date" id="edit-fecha">
+
+      <button class="btn-submit" id="btn-actualizar" style="margin-top: 16px;">Guardar Cambios</button>
+    </div>
   </div>
 
   <script src="app.js"></script>
