@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Facturas Cloud</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- Librería de Supabase (OBLIGATORIA para app.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- OCR Tesseract -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body>
+
+  <div class="container">
+    <!-- DÍAS DE GASTO -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Días de Mayor Gasto</span>
+        <span class="tag-badge">En la nube ☁️</span>
+      </div>
+      <div id="chart-dias"></div>
+    </div>
+
+    <!-- RANKING PROVEEDORES -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Ranking Proveedores</span>
+        <span class="tag-badge" id="total-acumulado">Q 0.00</span>
+      </div>
+      <div id="lista-proveedores-top"></div>
+    </div>
+
+    <!-- FORMULARIO -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Registrar Factura</span>
+      </div>
+
+      <label for="input-file" class="btn-camera">📸 Foto Factura (OCR)</label>
+      <input type="file" id="input-file" accept="image/*" capture="environment">
+      <img id="preview-img" alt="Vista previa">
+      <p id="loader">Leyendo texto...</p>
+
+      <input type="text" id="prov-input" placeholder="Proveedor">
+      <input type="number" id="monto-input" step="0.01" placeholder="Monto (Q)">
+      <input type="date" id="fecha-input">
+
+      <button class="btn-submit" id="btn-guardar">Subir a la nube</button>
+    </div>
+
+    <!-- HISTORIAL CON FOTOS -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Historial Global</span>
+      </div>
+      <div id="historial-facturas"></div>
+    </div>
+  </div>
+
+  <!-- MODAL VISOR -->
+  <div id="modal-visor" class="modal">
+    <button class="btn-close" id="btn-cerrar-modal">✕</button>
+    <img id="modal-img" class="modal-content" src="" alt="Factura Detalle">
+    <div id="modal-text" class="modal-info"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
