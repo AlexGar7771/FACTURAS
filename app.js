@@ -8,7 +8,7 @@ let facturasGlobal = [];
 let proveedoresCatalogo = [];
 let chartInteractivoInstance = null;
 
-// DICCIONARIO DE IDIOMAS
+// DICCIONARIO DE IDIOMAS (ES / EN)
 const i18n = {
   es: {
     tab_dashboard: '📊 Dashboard',
@@ -31,7 +31,7 @@ const i18n = {
     ranking_title: 'Ranking Proveedores',
     register_title: 'Registrar Factura',
     btn_photo: '📸 Foto Factura (OCR)',
-    ocr_loading: 'Leyendo datos con OCR...',
+    ocr_loading: 'Leyendo datos de factura...',
     lbl_supplier: 'Proveedor',
     lbl_amount: 'Monto (Q)',
     lbl_date: 'Fecha',
@@ -149,6 +149,7 @@ const editFecha = document.getElementById('edit-fecha');
 const editEstado = document.getElementById('edit-estado');
 const btnActualizar = document.getElementById('btn-actualizar');
 
+// Inicializar fechas
 const hoyISO = new Date().toISOString().split('T')[0];
 fechaInput.value = hoyISO;
 filtroMesInput.value = hoyISO.slice(0, 7);
@@ -156,12 +157,14 @@ filtroFechaDesde.value = hoyISO;
 filtroFechaHasta.value = hoyISO;
 
 // GESTIÓN DE IDIOMAS
-selectLang.value = idiomaActual;
-selectLang.addEventListener('change', (e) => {
-  idiomaActual = e.target.value;
-  localStorage.setItem('app_lang', idiomaActual);
-  aplicarTraducciones();
-});
+if (selectLang) {
+  selectLang.value = idiomaActual;
+  selectLang.addEventListener('change', (e) => {
+    idiomaActual = e.target.value;
+    localStorage.setItem('app_lang', idiomaActual);
+    aplicarTraducciones();
+  });
+}
 
 function t(key, vars = {}) {
   let str = (i18n[idiomaActual] && i18n[idiomaActual][key]) || i18n['es'][key] || key;
@@ -182,8 +185,10 @@ function aplicarTraducciones() {
     el.setAttribute('placeholder', t(key));
   });
 
-  document.getElementById('tab-btn-dashboard').innerText = t('tab_dashboard');
-  document.getElementById('tab-btn-pagos').innerText = t('tab_payments');
+  const tabDash = document.getElementById('tab-btn-dashboard');
+  const tabPagos = document.getElementById('tab-btn-pagos');
+  if (tabDash) tabDash.innerText = t('tab_dashboard');
+  if (tabPagos) tabPagos.innerText = t('tab_payments');
 
   poblarSelectoresProveedores();
   actualizarGraficas();
@@ -212,7 +217,7 @@ window.cambiarPestana = function(pestana) {
   }
 };
 
-// 2. CARGAR SELECTORES DE PROVEEDORES
+// 2. CARGAR Y POBLAR SELECTORES DE PROVEEDORES
 async function cargarProveedores() {
   const { data } = await db.from('proveedores').select('nombre').order('nombre');
   if (data) {
@@ -245,7 +250,7 @@ btnCrearProv.addEventListener('click', async () => {
 
   const { error } = await db.from('proveedores').insert([{ nombre }]);
   if (error) {
-    alert('Error / Supplier exists');
+    alert('El proveedor ya existe o hubo un error');
   } else {
     nuevoProvNombre.value = '';
     await cargarProveedores();
@@ -253,7 +258,7 @@ btnCrearProv.addEventListener('click', async () => {
   }
 });
 
-// 4. OCR TESSERACT
+// 4. OCR INTELIGENTE PARA FACTURAS GUATEMALTECAS (FEL)
 inputFile.addEventListener('change', (e) => {
   selectedFile = e.target.files[0];
   if (!selectedFile) return;
@@ -264,27 +269,95 @@ inputFile.addEventListener('change', (e) => {
     previewImg.style.display = 'block';
 
     loader.style.display = 'block';
+    loader.innerText = t('ocr_loading');
+
     try {
       const res = await Tesseract.recognize(reader.result, 'spa');
-      const lines = res.data.text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      const rawText = res.data.text;
+      const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-      const provMatch = proveedoresCatalogo.find(p =>
-        lines.some(l => l.toUpperCase().includes(p))
-      );
+      // --- 1. DETECCIÓN DEL PROVEEDOR (LOGO / ENCABEZADO) ---
+      const encabezado = lines.slice(0, 12).join(' ').toUpperCase();
+      let matchProveedor = null;
 
-      if (provMatch) provSelect.value = provMatch;
-
-      const montos = [];
-      const regex = /(\d+[\.,]\d{2})/;
-      lines.forEach(l => {
-        const low = l.toLowerCase();
-        if (low.includes('total') || low.includes('monto') || low.includes('pagar') || low.includes('amount')) {
-          const m = l.match(regex);
-          if (m) montos.push(parseFloat(m[0].replace(',', '.')));
+      for (const prov of proveedoresCatalogo) {
+        if (encabezado.includes(prov)) {
+          matchProveedor = prov;
+          break;
         }
-      });
-      if (montos.length > 0) montoInput.value = Math.max(...montos);
-    } catch (_) {
+      }
+
+      if (matchProveedor) {
+        provSelect.value = matchProveedor;
+      }
+
+      // --- 2. DETECCIÓN DE FECHA ---
+      let fechaDetectada = null;
+      const regexFechaNumerica = /\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/;
+      const regexFechaTexto = /(\d{1,2})\s+de\s+([a-zA-ZáéíóúÁÉÍÓÚ]+)\s+(?:del|de)\s+(\d{4})/i;
+
+      const mesesDic = {
+        'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
+        'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
+        'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
+      };
+
+      for (const linea of lines) {
+        const matchTexto = linea.match(regexFechaTexto);
+        if (matchTexto) {
+          const dia = matchTexto[1].padStart(2, '0');
+          const mesNom = matchTexto[2].toLowerCase();
+          const anio = matchTexto[3];
+          if (mesesDic[mesNom]) {
+            fechaDetectada = `${anio}-${mesesDic[mesNom]}-${dia}`;
+            break;
+          }
+        }
+
+        const matchNum = linea.match(regexFechaNumerica);
+        if (matchNum) {
+          const dia = matchNum[1].padStart(2, '0');
+          const mes = matchNum[2].padStart(2, '0');
+          const anio = matchNum[3];
+          fechaDetectada = `${anio}-${mes}-${dia}`;
+          break;
+        }
+      }
+
+      if (fechaDetectada) {
+        fechaInput.value = fechaDetectada;
+      }
+
+      // --- 3. DETECCIÓN DEL TOTAL (Q 00.00) ---
+      let totalDetectado = null;
+      const regexTotal = /(?:TOTAL|TOTAL\s*\(?Q\)?)[^\d]*Q?\s*(\d+[\.,]\d{2})/i;
+      const regexQuetzales = /Q\s*(\d+[\.,]\d{2})/gi;
+
+      for (const linea of lines) {
+        const match = linea.match(regexTotal);
+        if (match && match[1]) {
+          totalDetectado = parseFloat(match[1].replace(',', '.'));
+          break;
+        }
+      }
+
+      if (!totalDetectado) {
+        const montosEncontrados = [];
+        let matchQ;
+        while ((matchQ = regexQuetzales.exec(rawText)) !== null) {
+          montosEncontrados.push(parseFloat(matchQ[1].replace(',', '.')));
+        }
+        if (montosEncontrados.length > 0) {
+          totalDetectado = Math.max(...montosEncontrados);
+        }
+      }
+
+      if (totalDetectado && !isNaN(totalDetectado)) {
+        montoInput.value = totalDetectado.toFixed(2);
+      }
+
+    } catch (err) {
+      console.error('Error OCR:', err);
     } finally {
       loader.style.display = 'none';
     }
@@ -341,7 +414,7 @@ btnGuardar.addEventListener('click', async () => {
     selectedFile = null;
     cargarFacturas();
   } catch (err) {
-    alert('Error: ' + err.message);
+    alert('Error al guardar: ' + err.message);
   } finally {
     btnGuardar.innerText = t('btn_upload');
     btnGuardar.disabled = false;
@@ -370,7 +443,7 @@ async function cargarFacturas() {
   }
 }
 
-// 7. BANDEJA DE PAGOS
+// 7. BANDEJA DE CONTROL DE PAGOS
 function renderControlPagos() {
   const listaCont = document.getElementById('lista-cobros-pendientes');
   if (!listaCont) return;
@@ -424,14 +497,14 @@ window.marcarComoPagadoDesdePanel = async function(id, prov, monto) {
   }
 };
 
-// 8. ALTERNAR ESTADO RÁPIDO
+// 8. ALTERNAR ESTADO RÁPIDO DESDE HISTORIAL
 async function cambiarEstadoRapido(id, estadoActual) {
   const nuevoEstado = estadoActual === 'PAGADO' ? 'PENDIENTE' : 'PAGADO';
   const { error } = await db.from('facturas').update({ estado: nuevoEstado }).eq('id', id);
   if (!error) cargarFacturas();
 }
 
-// 9. GRÁFICAS DE GASTO POR DÍA
+// 9. GRÁFICAS DE GASTO POR DÍA (CON FILTROS)
 function actualizarGraficas() {
   const tipoFiltro = filtroGrafica.value;
   const hoy = new Date();
@@ -571,7 +644,7 @@ selectGraficoProv.addEventListener('change', (e) => {
   actualizarGraficoInteractivo(e.target.value);
 });
 
-// 11. HISTORIAL AGRUPADO
+// 11. HISTORIAL AGRUPADO CON EDICIÓN Y BORRADO
 function renderHistorialPorProveedor() {
   const container = document.getElementById('historial-grupos');
   container.innerHTML = '';
@@ -647,7 +720,7 @@ function renderHistorialPorProveedor() {
   });
 }
 
-// 12. BORRADO CON CLAVE
+// 12. BORRADO CON CONTRASEÑA
 async function eliminarFacturaSegura(id, prov, monto) {
   const claveIngresada = prompt(t('security_prompt', { prov: prov, amount: parseFloat(monto).toFixed(2) }));
   if (claveIngresada === null) return;
@@ -667,7 +740,7 @@ async function eliminarFacturaSegura(id, prov, monto) {
     alert(t('delete_success'));
     cargarFacturas();
   } catch (err) {
-    alert('Error: ' + err.message);
+    alert('Error al eliminar: ' + err.message);
   }
 }
 
@@ -707,14 +780,14 @@ btnActualizar.addEventListener('click', async () => {
     modalEditar.style.display = 'none';
     cargarFacturas();
   } catch (err) {
-    alert('Error: ' + err.message);
+    alert('Error al actualizar: ' + err.message);
   } finally {
     btnActualizar.innerText = t('btn_save_changes');
     btnActualizar.disabled = false;
   }
 });
 
-// MODAL FOTO
+// MODAL VISOR FOTO
 function verDetalleFoto(url, prov, monto, fecha) {
   document.getElementById('modal-img').src = url;
   document.getElementById('modal-text').innerText = `${prov} — Q ${parseFloat(monto).toFixed(2)} (${fecha})`;
